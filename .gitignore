@@ -1,0 +1,7 @@
+/node_modules
+/.vscode
+/vo_raw
+/data
+repomix-output.xml
+urls.txt
+TAOPAT_BRIER.md

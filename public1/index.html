@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#17110f">
+    <title>TaoPat</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <svg class="sprite" aria-hidden="true" focusable="false">
+        <symbol id="i-globe" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M3 12h18M12 3c3.2 3 3.2 15 0 18M12 3c-3.2 3-3.2 15 0 18"/>
+            </g>
+        </symbol>
+        <symbol id="i-sound" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"/>
+                <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>
+            </g>
+        </symbol>
+        <symbol id="i-mute" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"/>
+                <path d="M16 9.5l5 5M21 9.5l-5 5"/>
+            </g>
+        </symbol>
+    </svg>
+
+    <main id="stage" class="stage">
+        <div class="backdrop" aria-hidden="true"><div class="seal"></div></div>
+
+        <header class="masthead">
+            <h1 class="wordmark">Tao<span>Pat</span></h1>
+            <p class="hint">Click or tap to pat</p>
+        </header>
+
+        <section class="tally" aria-label="Your pats">
+            <p class="tally-label">Pats by you</p>
+            <p class="tally-count"><span id="userTaps">0</span></p>
+            <p class="tally-rate"><span id="userTPS">0</span> pats/s</p>
+        </section>
+
+        <!-- Only this element (and its children) counts as a tap target -->
+        <div id="character" class="character" role="button" tabindex="0" aria-label="Pat the character">
+            <div id="characterStage" class="character-stage">
+                <img id="characterImg" class="character-img" alt="" draggable="false" hidden>
+                <div id="characterFallback" class="character-fallback"><span>tao-base.png<br>not found</span></div>
+            </div>
+
+            <div id="fxRing" class="fx-ring"></div>
+
+            <div id="patHand" class="pat-hand" aria-hidden="true">
+                <div id="patHandSprite" class="pat-hand-sprite" hidden></div>
+            </div>
+        </div>
+    </main>
+
+    <div class="topbar">
+        <div class="status" data-state="connecting">
+            <span id="connectionDot" class="status-dot"></span>
+            <span id="connectionText">Connecting</span>
+        </div>
+
+        <button id="muteBtn" class="icon-btn" type="button" aria-pressed="false" aria-label="Mute">
+            <svg class="icon icon-sound"><use href="#i-sound"></use></svg>
+            <svg class="icon icon-mute"><use href="#i-mute"></use></svg>
+        </button>
+    </div>
+
+    <section id="board" class="board" data-open="false" aria-label="Leaderboard">
+        <button id="boardToggle" class="board-bar" type="button" aria-expanded="false" aria-controls="boardPanel">
+            <span class="bar-top">
+                <span class="bar-rank">No. 1</span>
+                <span id="topFlag" class="flag-slot"></span>
+                <strong id="topTaps">-</strong>
+            </span>
+
+            <span class="bar-title">Leaderboard</span>
+
+            <span class="bar-mine">
+                <span class="bar-tag">You</span>
+                <span id="myRegionFlag" class="flag-slot"><svg class="icon"><use href="#i-globe"></use></svg></span>
+                <strong id="regionTaps">0</strong>
+            </span>
+
+            <span class="bar-chevron" aria-hidden="true"></span>
+        </button>
+
+        <div id="boardPanel" class="board-panel">
+            <div class="lb-row lb-world">
+                <span class="lb-rank"></span>
+                <span class="lb-flag"><svg class="icon"><use href="#i-globe"></use></svg></span>
+                <span class="lb-name">Worldwide</span>
+                <span id="globalTPS" class="lb-pps" hidden></span>
+                <strong id="globalTaps" class="lb-taps">0</strong>
+            </div>
+
+            <div id="leaderboard" class="lb-list">
+                <div class="loading">Loading leaderboard...</div>
+            </div>
+
+            <div class="board-foot">
+                Your region: <strong id="myRegion">Loading...</strong>
+                &middot; <strong id="regionTPS">0</strong> pats/s
+            </div>
+        </div>
+    </section>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/fx.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
