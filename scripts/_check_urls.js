@@ -24,7 +24,7 @@ const urls = [
 ];
 
 let pass = 0, fail = 0;
-const { PORT } = require("./config");
+const { PORT } = require("../config");
 
 async function check(path) {
   return new Promise((resolve) => {

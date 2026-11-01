@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 // Resolve relative to this script, not the current working directory.
 const html = fs.readFileSync(
-  path.join(__dirname, "public", "index.html"),
+  path.join(__dirname, "..", "public", "index.html"),
   "utf8"
 );
 

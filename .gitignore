@@ -4,20 +4,14 @@
 
 # Local runtime data and secrets
 /data
-/vo_raw
 .env
 DEPLOY_FACTS.md
+
+# Local-only working directories
+/instructions
+/assets-src
+/archive
+
+# Generated / scratch files
 repomix-output.xml
 urls.txt
-
-# Legacy duplicate front end (not served; use public/)
-/public1
-
-# One-off dev scripts superseded by tests/
-/_check_picker.js
-
-# Agent task/prompt scaffolding (kept locally, not part of the app)
-/instructions
-/MASTER_PROMPT.md
-/README_FIRST.md
-/TASK_*.md
