@@ -11,6 +11,11 @@ npm start
 
 Open <http://localhost:3000> in your browser.
 
+## Configuration
+
+Copy `.env.example` to `.env` and edit the values you need. All variables are
+optional and documented inside `.env.example`. They are all read in `config.js`.
+
 ## Credits
 
 - **Pat hand sprite & pat sounds** (`patpat.png`, `pat.ogg`, `pat1.ogg`, `pat2.ogg`) come from [LopyMine/PatPat](https://github.com/LopyMine/PatPat). Check that repository for its license terms before redistribution.

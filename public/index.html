@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#17110f">
     <title>TaoPat</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <svg class="sprite" aria-hidden="true" focusable="false">
@@ -36,6 +36,32 @@
         <symbol id="i-close" viewBox="0 0 24 24">
             <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <path d="M6 6l12 12M18 6L6 18"/>
+            </g>
+        </symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M4 7h16M4 12h16M4 17h16"/>
+            </g>
+        </symbol>
+        <symbol id="i-music" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V6l10-2v12"/>
+                <circle cx="6.5" cy="18" r="2.5"/>
+                <circle cx="16.5" cy="16" r="2.5"/>
+            </g>
+        </symbol>
+        <symbol id="i-music-off" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V9.5M9 6l10-2v7M19 14.5V16"/>
+                <circle cx="6.5" cy="18" r="2.5"/>
+                <circle cx="16.5" cy="16" r="2.5"/>
+                <path d="M4 4l16 16"/>
+            </g>
+        </symbol>
+        <symbol id="i-link" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/>
+                <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>
             </g>
         </symbol>
     </svg>
@@ -89,14 +115,45 @@
             <span id="connectionText">Connecting</span>
         </div>
 
-        <button id="recordBtn" class="icon-btn" type="button" aria-expanded="false" aria-controls="record" aria-label="Your record">
-            <svg class="icon"><use href="#i-record"></use></svg>
-        </button>
+        <div id="menu" class="menu" data-open="false">
+            <button id="menuBtn" class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuPanel" aria-label="Open menu">
+                <svg class="icon"><use href="#i-menu"></use></svg>
+            </button>
 
-        <button id="muteBtn" class="icon-btn" type="button" aria-pressed="false" aria-label="Mute">
-            <svg class="icon icon-sound"><use href="#i-sound"></use></svg>
-            <svg class="icon icon-mute"><use href="#i-mute"></use></svg>
-        </button>
+            <div id="menuPanel" class="menu-panel" role="menu" aria-label="Options">
+                <button id="recordBtn" class="menu-item" type="button" role="menuitem" aria-expanded="false" aria-controls="record">
+                    <svg class="icon"><use href="#i-record"></use></svg>
+                    <span class="menu-item-label">Your record</span>
+                </button>
+
+                <button id="muteBtn" class="menu-item" type="button" role="menuitem" aria-pressed="false" aria-label="Game sounds">
+                    <svg class="icon icon-sound"><use href="#i-sound"></use></svg>
+                    <svg class="icon icon-mute"><use href="#i-mute"></use></svg>
+                    <span class="menu-item-label">Game sounds</span>
+                </button>
+
+                <button id="musicBtn" class="menu-item" type="button" role="menuitem" aria-pressed="false" aria-label="Background music">
+                    <svg class="icon icon-music-on"><use href="#i-music"></use></svg>
+                    <svg class="icon icon-music-off"><use href="#i-music-off"></use></svg>
+                    <span class="menu-item-label">Music</span>
+                </button>
+
+                <button id="boardMenuBtn" class="menu-item" type="button" role="menuitem">
+                    <svg class="icon"><use href="#i-globe"></use></svg>
+                    <span class="menu-item-label">Leaderboard</span>
+                </button>
+
+                <a id="creatorLink" class="menu-item" role="menuitem" href="https://deni26.my.id/" target="_blank" rel="noopener noreferrer">
+                    <svg class="icon"><use href="#i-link"></use></svg>
+                    <span class="menu-item-label">About the creator</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="musicToast" class="music-toast" hidden role="status" aria-live="polite">
+        <span class="music-toast-label">Now playing</span>
+        <strong id="musicToastTitle" class="music-toast-title"></strong>
     </div>
 
     <section id="board" class="board" data-open="false" aria-label="Leaderboard">
@@ -153,9 +210,13 @@
         <ul id="recordStamps" class="record-stamps"></ul>
     </section>
 
+    <!-- Socket.IO client is a server endpoint (root-relative on purpose). -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/fx.js"></script>
-    <script src="/js/game.js"></script>
-    <script src="/js/app.js"></script>
+    <script src="js/tao-core.js"></script>
+    <script src="js/fx.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/music.js"></script>
+    <script src="js/menu.js"></script>
 </body>
 </html>

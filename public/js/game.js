@@ -12,22 +12,15 @@
     const RATE_WINDOW_MS = 1000;
     const MAX_QUEUED_STAMPS = 4;
 
-    // total / combo / rate = threshold that unlocks the stamp
-    const ACHIEVEMENTS = [
-        { id: "pats-1",     title: "First pat",    label: "Milestone", total: 1 },
-        { id: "pats-100",   title: "100 pats",     label: "Milestone", total: 100 },
-        { id: "pats-500",   title: "500 pats",     label: "Milestone", total: 500 },
-        { id: "pats-1000",  title: "1,000 pats",   label: "Milestone", total: 1000 },
-        { id: "pats-2500",  title: "2,500 pats",   label: "Milestone", total: 2500 },
-        { id: "pats-5000",  title: "5,000 pats",   label: "Milestone", total: 5000 },
-        { id: "pats-10000", title: "10,000 pats",  label: "Milestone", total: 10000 },
-        { id: "combo-10",   title: "Combo \u00d710",   label: "Combo", combo: 10 },
-        { id: "combo-25",   title: "Combo \u00d725",   label: "Combo", combo: 25 },
-        { id: "combo-50",   title: "Combo \u00d750",   label: "Combo", combo: 50 },
-        { id: "combo-100",  title: "Combo \u00d7100",  label: "Combo", combo: 100 },
-        { id: "rate-8",     title: "8 pats/s",     label: "Speed", rate: 8 },
-        { id: "rate-12",    title: "12 pats/s",    label: "Speed", rate: 12 }
-    ];
+    // Single source of truth shared with the server: public/js/tao-core.js
+    const CORE = window.TaoCore;
+    const CATEGORY_LABEL = {
+        milestone: "Milestone", combo: "Combo", speed: "Speed",
+        session: "Session", dedication: "Dedication"
+    };
+    const ACHIEVEMENTS = CORE && CORE.ACHIEVEMENTS
+        ? CORE.ACHIEVEMENTS.map((a) => Object.assign({ label: CATEGORY_LABEL[a.category] || "Stamp" }, a))
+        : [];
 
     const $ = (id) => document.getElementById(id);
     const els = {
@@ -116,6 +109,8 @@
     // COMBO
     // ------------------------------------------------------
     let combo = 0;
+    let visitTaps = 0;     // taps in this page visit (for session-goal progress)
+    let server = null;     // last `user` object received in initialState
     let tier = 0;
     let lastTapAt = -Infinity;
     let breakTimer = null;
@@ -175,6 +170,9 @@
         els.stampLabel.textContent = label;
         els.stampTitle.textContent = title;
         els.stamp.hidden = false;
+        if (window.TaoFX && typeof window.TaoFX.onStampShow === "function") {
+            window.TaoFX.onStampShow();   // sound is played when the stamp lands, not when it unlocks
+        }
 
         const base = "translate(-50%, -50%) rotate(-6deg)";
         const frames = reduceMotion
@@ -207,6 +205,7 @@
 
         combo = (combo > 0 && now - lastTapAt <= COMBO_GAP_MS) ? combo + 1 : 1;
         lastTapAt = now;
+        visitTaps += 1;
 
         recentTaps.push(now);
         while (recentTaps.length && recentTaps[0] < now - RATE_WINDOW_MS) recentTaps.shift();
@@ -225,37 +224,43 @@
         if (combo > state.bestCombo) { state.bestCombo = combo; scheduleSave(); }
         if (rate > state.bestRate) { state.bestRate = rate; scheduleSave(); }
 
-        // First call: silently credit total-based stamps the player already earned,
-        // so an existing player is not spammed with old milestones.
-        if (!state.seeded) {
-            ACHIEVEMENTS.forEach((a) => {
-                if (a.total && a.total < total && state.unlocked[a.id] === undefined) {
-                    state.unlocked[a.id] = 0;
-                }
-            });
-            state.seeded = true;
-            scheduleSave();
-        }
+        return { combo, tier, tierUp, rate, unlocked: [] };
+    }
 
-        const unlocked = [];
-        ACHIEVEMENTS.forEach((a) => {
-            if (state.unlocked[a.id] !== undefined) return;
-            const reached = (a.total && total >= a.total) ||
-                (a.combo && combo >= a.combo) ||
-                (a.rate && rate >= a.rate);
-            if (!reached) return;
+    // ------------------------------------------------------
+    // SERVER-AUTHORITATIVE STAMPS
+    // ------------------------------------------------------
+    function onServerState(user) {
+        server = user || null;
+        if (!server) return;
 
-            state.unlocked[a.id] = Date.now();
-            unlocked.push(a);
+        // Server wins for everything it owns. No popups for stamps earned earlier.
+        state.unlocked = Object.assign({}, server.stamps || {});
+        if (Number(server.bestCombo) > state.bestCombo) state.bestCombo = Number(server.bestCombo);
+        if (Number(server.bestRate) > state.bestRate) state.bestRate = Number(server.bestRate);
+        if (Number(server.sessions) > 0) state.sessions = Number(server.sessions);
+        if (Number(server.firstSeen) > 0) state.firstSeen = Number(server.firstSeen);
+        saveNow();
+        if (!els.record.hidden) renderRecord();
+    }
+
+    function onServerStamps(ids) {
+        const now = Date.now();
+        let fresh = 0;
+
+        (Array.isArray(ids) ? ids : []).forEach((id) => {
+            const a = ACHIEVEMENTS.find((item) => item.id === id);
+            if (!a || state.unlocked[id] !== undefined) return;
+            state.unlocked[id] = now;
+            fresh += 1;
             showStamp(a.label, a.title);
         });
 
-        if (unlocked.length) {
+        if (fresh) {
             saveNow();
+            if (window.TaoFX && typeof window.TaoFX.onGift === "function") window.TaoFX.onGift();
             if (!els.record.hidden) renderRecord();
         }
-
-        return { combo, tier, tierUp, rate, unlocked };
     }
 
     // ------------------------------------------------------
@@ -284,10 +289,20 @@
         addStat("Best combo", "\u00d7" + state.bestCombo.toLocaleString());
         addStat("Peak speed", state.bestRate.toLocaleString() + " pats/s");
         addStat("Sessions", state.sessions.toLocaleString());
+        addStat("Days played", (server ? Number(server.activeDays) || 0 : 0).toLocaleString());
         addStat("Playing since", formatDate(state.firstSeen));
 
         els.stampCount.textContent = earned + " / " + ACHIEVEMENTS.length;
         els.recordStamps.textContent = "";
+
+        const stats = {
+            total: total,
+            combo: state.bestCombo,
+            rate: state.bestRate,
+            session: visitTaps,
+            sessions: state.sessions,
+            days: server ? Number(server.activeDays) || 0 : 0
+        };
 
         ACHIEVEMENTS.forEach((a) => {
             const at = state.unlocked[a.id];
@@ -298,11 +313,23 @@
             title.className = "record-stamp-title";
             title.textContent = a.title;
 
+            const desc = document.createElement("span");
+            desc.className = "record-stamp-desc";
+            desc.textContent = a.desc || "";
+
             const meta = document.createElement("span");
             meta.className = "record-stamp-meta";
-            meta.textContent = at === undefined ? "Not yet" : (at === 0 ? "Earlier" : formatDate(at));
 
-            li.append(title, meta);
+            if (at !== undefined) {
+                meta.textContent = at === 0 ? "Earlier" : formatDate(at);
+            } else {
+                const p = CORE && CORE.progressFor ? CORE.progressFor(a, stats) : null;
+                meta.textContent = p
+                    ? p.value.toLocaleString() + " / " + p.target.toLocaleString()
+                    : "Not yet";
+            }
+
+            li.append(title, desc, meta);
             els.recordStamps.append(li);
         });
     }
@@ -332,6 +359,8 @@
 
     window.TaoGame = {
         onTap,
+        onServerState,
+        onServerStamps,
         openRecord,
         closeRecord,
         get combo() { return combo; },

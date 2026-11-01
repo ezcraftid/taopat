@@ -29,12 +29,14 @@
                     "combo-04.mp3", "combo-05.mp3", "combo-06.mp3"],         // combo tier 1 and 2
             hype: ["hype-01.mp3", "hype-02.mp3", "hype-03.mp3"],             // combo tier 3 and 4
             gift: ["gift-01.mp3", "gift-02.mp3", "gift-03.mp3"],             // a new stamp is earned
+            stamp: ["stamp-01.mp3", "stamp-02.mp3"],                         // sound effect when a stamp lands
             lowHp: ["lowhp-01.mp3"],                                         // connection lost
             healed: ["healed-01.mp3"]                                        // connection back
         },
         milestones: [100, 500, 1000, 2500, 5000],        // then every multiple of milestoneEvery
         milestoneEvery: 10000,
         volume: 0.85,
+        stampGain: 1.2,               // stamp sound effect loudness (1 = same as pats)
         avoidImmediateRepeat: true,   // still random; just never the same file twice in a row
         maxPatVoices: 6,              // polyphony cap for overlapping pat sounds
         patDurationMs: 260,           // one pat = all sprite frames, once
@@ -60,7 +62,7 @@
 
     if (!character || !stage || !characterImg || !characterFallback ||
         !patHand || !patHandSprite || !fxRing || !muteBtn) {
-        window.TaoFX = { onTap() {}, onConnect() {}, onDisconnect() {}, onComboEnd() {} };
+        window.TaoFX = { onTap() {}, onConnect() {}, onDisconnect() {}, onComboEnd() {}, onGift() {}, onStampShow() {} };
         return;
     }
 
@@ -244,6 +246,24 @@
         while (patVoices.length > CONFIG.maxPatVoices) {
             try { patVoices.shift().stop(); } catch (_) { /* ignore */ }
         }
+    }
+
+    // Stamp sound effect: a one-shot that never cuts a voice line.
+    let lastStampAt = 0;
+    function playStamp() {
+        if (!ctx || muted) return;
+        const now = performance.now();
+        if (now - lastStampAt < 150) return;   // never stack two stamp sounds on top of each other
+        lastStampAt = now;
+        const buffer = pickBuffer("stamp");
+        if (!buffer) return;
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const boost = ctx.createGain();
+        boost.gain.value = CONFIG.stampGain;
+        source.connect(boost);
+        boost.connect(gain);
+        source.start();
     }
 
     // Voice lines (milestone, hello, idle, lowHp, healed): one at a time.
@@ -550,6 +570,11 @@
         spawnFlecks(flecks);
     }
 
+    // game.js calls this when the server confirms a new stamp.
+    function onGift() {
+        playVoice("gift", { interrupt: true });
+    }
+
     // game.js calls this when the combo times out.
     function onComboEnd() {
         if (faceFlash === "combo") {
@@ -644,7 +669,6 @@
                 "muted: " + muted + "  face: " + currentFace + "\n" +
                 "faces: " + (Object.keys(faces).join(",") || "-") + "\n" +
                 "game: " + (window.TaoGame ? ("combo " + window.TaoGame.combo + " tier " + window.TaoGame.tier) : "none") + "\n" +
-                "socket: " + (window.__socketState ? (window.__socketState() ? "connected" : "disconnected") : "n/a") + "  err: " + (window.__lastSocketError || "-") + "\n" +
                 "last pat: " + (lastPicked.pat || "-") + "\n" +
                 "errors: " + (audioErrors.slice(-4).join(" | ") || "-");
         }, 400);
@@ -655,6 +679,8 @@
         onConnect,
         onDisconnect,
         onComboEnd,
+        onGift,
+        onStampShow: playStamp,   // called by game.js when a stamp appears on screen
         get lastPatFile() { return lastPicked.pat || null; }   // handy for manual testing
     };
 })();

@@ -2,9 +2,14 @@ const http = require("http");
 
 const urls = [
   "/",
+  "/healthz",
   "/css/style.css",
   "/js/app.js",
   "/js/fx.js",
+  "/js/game.js",
+  "/js/tao-core.js",
+  "/js/music.js",
+  "/js/menu.js",
   "/assets/img/patpat.png",
   "/assets/img/tao-base.png",
   "/assets/audio/pat.ogg",
@@ -19,10 +24,11 @@ const urls = [
 ];
 
 let pass = 0, fail = 0;
+const { PORT } = require("./config");
 
 async function check(path) {
   return new Promise((resolve) => {
-    http.get(`http://localhost:3000${path}`, (res) => {
+    http.get(`http://localhost:${PORT}${path}`, (res) => {
       res.resume();
       if (res.statusCode === 200) { pass++; console.log(`  OK  ${path}`); }
       else { fail++; console.log(`FAIL  ${path} -> ${res.statusCode}`); }

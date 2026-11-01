@@ -5,3 +5,5 @@
 repomix-output.xml
 urls.txt
 TAOPAT_BRIER.md
+.env
+DEPLOY_FACTS.md

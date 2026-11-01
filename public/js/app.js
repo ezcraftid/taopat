@@ -1,8 +1,51 @@
-const socket = io();
+// public/js/app.js
+//
+// Everything lives inside one closure: `socket`, the tap buffer and the counters
+// are not reachable from the DevTools console, and pats only count from real
+// (isTrusted) user input. This stops casual console tampering, but it is NOT the
+// security boundary: a determined cheater can skip this page and talk to the
+// socket directly. The real protection is server-side (see server.js/guard.js),
+// which treats every number from the client as untrusted.
+(() => {
+"use strict";
+
+// ======================================================
+// CLIENT IDENTITY (pseudonymous, persisted in first-party localStorage)
+// ======================================================
+
+const CLIENT_ID_KEY = "tao-client-id-v1";
+
+function getClientId() {
+    if (!window.TaoCore) return undefined;
+
+    let id = null;
+    try { id = localStorage.getItem(CLIENT_ID_KEY); } catch (_) { /* ignore */ }
+
+    if (!TaoCore.isValidClientId(id)) {
+        id = TaoCore.generateClientId();
+        try { localStorage.setItem(CLIENT_ID_KEY, id); } catch (_) { /* ignore */ }
+    }
+    return id;
+}
+
+// Only the identity is sent. The old `seedTotal` field is gone: the server no
+// longer accepts a client-supplied starting total.
+const socket = io({
+    auth: {
+        clientId: getClientId()
+    }
+});
 
 // ======================================================
 // STATE
 // ======================================================
+
+// Batching. Stay below the server's per-player rate (25 taps/s) so an honest
+// client is never throttled: 6 taps per 250 ms = 24/s. Anything above that stays
+// in the buffer and is sent on the next tick instead of being lost.
+const BATCH_INTERVAL_MS = 250;
+const MAX_TAPS_PER_BATCH = 6;
+const MAX_BUFFERED_TAPS = 300;
 
 let localTapBuffer = 0;
 let userTaps = 0;
@@ -99,7 +142,11 @@ function setFlag(element, code, fallbackEmoji) {
 
 function tap() {
     userTaps++;
-    localTapBuffer++;
+
+    // Bounded, so a long offline stretch cannot queue an unbounded backlog.
+    if (localTapBuffer < MAX_BUFFERED_TAPS) {
+        localTapBuffer++;
+    }
 
     userTapsElement.textContent = userTaps.toLocaleString();
     document.body.classList.add("has-tapped");
@@ -111,14 +158,17 @@ function tap() {
 
 // Only presses ON THE CHARACTER count. pointerdown covers mouse, touch and pen,
 // and fires once per finger, so multi-touch gives multiple pats.
+// `isTrusted` is false for events a script creates with dispatchEvent(), so
+// console-injected synthetic clicks are ignored.
 characterElement.addEventListener("pointerdown", (event) => {
+    if (!event.isTrusted) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     tap();
 });
 
 // Keyboard: only when the character itself is focused (it has tabindex="0").
 characterElement.addEventListener("keydown", (event) => {
-    if (event.repeat) return;
+    if (!event.isTrusted || event.repeat) return;
     if (event.key === " " || event.key === "Enter") {
         event.preventDefault();
         tap();
@@ -132,17 +182,19 @@ characterElement.addEventListener("contextmenu", (event) => event.preventDefault
 // SEND BATCH
 // ======================================================
 
-// Send every 250ms
+// Nothing is sent while offline: the buffer simply keeps filling (bounded) and
+// drains at a safe pace after reconnecting, instead of dumping a burst that the
+// server would have to throttle.
 setInterval(() => {
-    if (localTapBuffer <= 0) {
+    if (localTapBuffer <= 0 || !socket.connected) {
         return;
     }
 
-    const amount = localTapBuffer;
-    localTapBuffer = 0;
+    const amount = Math.min(localTapBuffer, MAX_TAPS_PER_BATCH);
+    localTapBuffer -= amount;
 
     socket.emit("tapBatch", amount);
-}, 250);
+}, BATCH_INTERVAL_MS);
 
 // ======================================================
 // CONNECTION
@@ -166,11 +218,14 @@ socket.on("disconnect", () => {
     }
 });
 
-window.__socketState = () => socket.connected;
 socket.on("connect_error", (err) => {
     connectionText.textContent = "Offline";
     statusElement.dataset.state = "offline";
-    window.__lastSocketError = (err && err.message) ? err.message : String(err);
+
+    // A temporary block should not be hammered with retries.
+    if (err && err.message === "banned") {
+        socket.disconnect();
+    }
 });
 
 // ======================================================
@@ -186,7 +241,25 @@ socket.on("initialState", (data) => {
     lastRegionTaps = data.region.taps;
     regionTapsElement.textContent = data.region.taps.toLocaleString();
     globalTapsElement.textContent = data.global.taps.toLocaleString();
+
+    // Durable identity: persist a server-generated ID if ours was missing/invalid.
+    if (data.user) {
+        if (data.user.clientId && window.TaoCore && !data.user.clientIdValid) {
+            try { localStorage.setItem(CLIENT_ID_KEY, data.user.clientId); } catch (_) { /* ignore */ }
+        }
+
+        userTaps = Math.max(userTaps, Number(data.user.taps) || 0);
+        userTapsElement.textContent = userTaps.toLocaleString();
+
+        if (window.TaoGame && typeof window.TaoGame.onServerState === "function") {
+            window.TaoGame.onServerState(data.user);
+        }
+    }
 });
+
+// The former `tao:stamps` / `tao:stats` DOM-event bridges were removed: the
+// server ignores client stamp/stat claims, so forwarding them only gave any
+// script on the page a way to spam the socket.
 
 // ======================================================
 // USER STATS
@@ -198,6 +271,13 @@ socket.on("userStats", (data) => {
 
     userTapsElement.textContent = userTaps.toLocaleString();
     userTPSElement.textContent = userTPS.toLocaleString();
+});
+
+// New stamps are awarded by the server; the UI only displays them.
+socket.on("stampsAccepted", (ids) => {
+    if (window.TaoGame && typeof window.TaoGame.onServerStamps === "function") {
+        window.TaoGame.onServerStamps(ids);
+    }
 });
 
 // ======================================================
@@ -349,3 +429,13 @@ window.addEventListener("keydown", (event) => {
         setBoardOpen(false);
     }
 });
+
+// Exposed so the consolidated menu (menu.js) can open/close the leaderboard.
+// This only toggles a panel; it cannot change any count.
+window.TaoBoard = Object.freeze({
+    open: () => setBoardOpen(true),
+    close: () => setBoardOpen(false),
+    toggle: () => setBoardOpen(!isBoardOpen())
+});
+
+})();
