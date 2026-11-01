@@ -102,6 +102,94 @@
     }
 
     // ------------------------------------------------------
+    // APP BASE PATH (server routes, not static assets)
+    //   Static assets stay document-relative (assetUrl above). Server routes
+    //   such as /socket.io and /api must be prefixed with the deployment base
+    //   path, which the server injects as <meta name="app-base-path">.
+    //   Pure helpers, so the Node server and the browser share one rule set.
+    // ------------------------------------------------------
+    const BASE_PATH_INVALID_RE = /[\u0000-\u001f\u007f\\?#"'<>]/;
+
+    function normalizeBasePath(value) {
+        if (typeof value !== "string") return "";
+
+        let raw = value.trim();
+        if (raw === "" || raw === "/") return "";
+
+        // One leading slash, no duplicate slashes, no trailing slash.
+        raw = raw.replace(/\/{2,}/g, "/");
+        if (raw.charAt(0) !== "/") raw = "/" + raw;
+        raw = raw.replace(/\/+$/, "");
+
+        if (!raw || BASE_PATH_INVALID_RE.test(raw)) return "";
+
+        const segments = raw.split("/").filter(Boolean);
+        for (const segment of segments) {
+            if (segment === "." || segment === "..") return "";
+        }
+
+        return "/" + segments.join("/");
+    }
+
+    function withBase(basePath, route) {
+        const base = normalizeBasePath(basePath);
+
+        if (typeof route !== "string" || route === "") return base || "/";
+
+        // Absolute and protocol-relative URLs never get a prefix.
+        if (/^[a-z][a-z0-9+.-]*:/i.test(route) || route.slice(0, 2) === "//") return route;
+
+        const path = route.charAt(0) === "/" ? route : "/" + route;
+        if (!base) return path;
+        if (path === "/") return base + "/";
+
+        return base + path;
+    }
+
+    function stripBase(basePath, url) {
+        const base = normalizeBasePath(basePath);
+
+        if (typeof url !== "string" || url === "") return null;
+        if (!base) return url;
+
+        const queryIndex = url.indexOf("?");
+        const pathname = queryIndex === -1 ? url : url.slice(0, queryIndex);
+        const search = queryIndex === -1 ? "" : url.slice(queryIndex);
+
+        if (pathname === base) return "/" + search;
+        if (pathname.slice(0, base.length + 1) !== base + "/") return null;
+
+        return pathname.slice(base.length) + search;
+    }
+
+    let APP_BASE = detectAppBase();
+
+    function detectAppBase() {
+        if (typeof document === "undefined" || typeof document.querySelector !== "function") {
+            return "";
+        }
+
+        try {
+            const meta = document.querySelector('meta[name="app-base-path"]');
+            return meta ? normalizeBasePath(meta.getAttribute("content") || "") : "";
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function setBasePath(value) {
+        APP_BASE = normalizeBasePath(value);
+    }
+
+    function basePath() {
+        return APP_BASE;
+    }
+
+    function appUrl(route) {
+        return withBase(APP_BASE, route);
+    }
+
+    // ------------------------------------------------------
     // ACHIEVEMENTS (single source of truth for client + server)
     //   category: milestone | combo | speed | session | dedication
     //   exactly one threshold key is set per entry
@@ -203,6 +291,12 @@
         setAssetBase,
         resolveAssetUrl,
         assetUrl,
+        normalizeBasePath,
+        withBase,
+        stripBase,
+        setBasePath,
+        basePath,
+        appUrl,
         ACHIEVEMENTS,
         thresholdOf,
         isUnlocked,

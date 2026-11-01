@@ -31,6 +31,7 @@ function getClientId() {
 // Only the identity is sent. The old `seedTotal` field is gone: the server no
 // longer accepts a client-supplied starting total.
 const socket = io({
+    path: window.TaoCore ? TaoCore.appUrl("/socket.io/") : "/socket.io/",
     auth: {
         clientId: getClientId()
     }

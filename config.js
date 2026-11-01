@@ -11,6 +11,7 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env"), quiet: true });
 
 const guardLib = require("./lib/guard");
+const core = require("./public/js/tao-core.js");
 
 function str(name, fallback) {
     const raw = process.env[name];
@@ -52,6 +53,10 @@ module.exports = Object.freeze({
     // which is exactly the old behavior. Use 127.0.0.1 to accept local
     // connections only (e.g. when behind Cloudflare Tunnel / a reverse proxy).
     HOST: str("HOST", ""),
+
+    // URL prefix the app is publicly served under. Empty = site root.
+    // Normalized to "" or "/TaoPat" (leading slash, no trailing slash).
+    BASE_PATH: core.normalizeBasePath(str("BASE_PATH", "")),
 
     // How client IPs are resolved: auto | off | on | cloudflare (see lib/guard.js).
     TRUST_PROXY: str("TRUST_PROXY", "auto").toLowerCase(),

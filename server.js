@@ -19,6 +19,7 @@ const Database = require("better-sqlite3");
 const { Server } = require("socket.io");
 const { createShutdownController } = require("./lib/shutdown");
 const guardLib = require("./lib/guard");
+const basepath = require("./lib/basepath");
 const config = require("./config");
 const core = require("./public/js/tao-core.js");
 
@@ -29,6 +30,7 @@ const core = require("./public/js/tao-core.js");
 
 const PORT = config.PORT;
 const HOST = config.HOST;
+const BASE_PATH = config.BASE_PATH;
 const TRUST_PROXY = config.TRUST_PROXY;
 const ALLOWED_ORIGINS = config.ALLOWED_ORIGINS;
 
@@ -52,6 +54,10 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
+
+    // Socket.IO stays at the origin root. A proxy that keeps the public prefix
+    // is normalized below, before Engine.IO inspects req.url.
+    path: "/socket.io/",
 
     // Real payloads are a few bytes. The default (1 MB) invites memory abuse.
     maxHttpBufferSize: 4 * 1024,
@@ -77,6 +83,33 @@ const io = new Server(server, {
 // directory and still find its database, backups and static assets.
 const PROJECT_ROOT = __dirname;
 const PUBLIC_DIR = path.join(PROJECT_ROOT, "public");
+const INDEX_HTML_PATH = path.join(PUBLIC_DIR, "index.html");
+
+// Read once: the base path is fixed for the process lifetime. The optional
+// <base> tag keeps document-relative assets correct even without a trailing
+// slash (e.g. https://host/TaoPat).
+const INDEX_HTML = basepath.renderIndexHtml(
+    fs.readFileSync(INDEX_HTML_PATH, "utf8"),
+    BASE_PATH
+);
+
+// A proxy may forward the public prefix unchanged (case B) or strip it (case A).
+// Normalize before Engine.IO and Express see the request so both shapes behave
+// identically. prependListener runs before Engine.IO's request/upgrade handlers.
+if (BASE_PATH) {
+
+    const normalizeRequestPath = (req) => {
+
+        const stripped = basepath.stripBase(BASE_PATH, req.url);
+
+        if (stripped !== null) {
+            req.url = stripped;
+        }
+    };
+
+    server.prependListener("request", normalizeRequestPath);
+    server.prependListener("upgrade", normalizeRequestPath);
+}
 
 
 // ======================================================
@@ -294,6 +327,16 @@ app.use((req, res, next) => {
 
     next();
 });
+
+// Serve the page with the deployment prefix injected. The route is registered
+// before express.static so the placeholder is never sent to a browser.
+function sendIndex(req, res) {
+
+    res.set("Cache-Control", "no-cache").type("html").send(INDEX_HTML);
+}
+
+app.get("/", sendIndex);
+app.get("/index.html", sendIndex);
 
 // Health check for the tunnel / monitoring. 503 while shutting down.
 app.get("/healthz", (req, res) => {
@@ -1592,6 +1635,9 @@ ${PORT}
 
 Host:
 ${HOST || "all interfaces"}
+
+Base path:
+${BASE_PATH || "/"}
 
 Database:
 ${DB_PATH}

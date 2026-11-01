@@ -15,6 +15,7 @@ function isLocalRelative(ref) {
     if (ref.charAt(0) === "/") return false;              // root-relative route
     if (ref.slice(0, 2) === "//") return false;           // protocol-relative
     if (/^[a-z][a-z0-9+.-]*:/i.test(ref)) return false;   // scheme (http:, data:, mailto:)
+    if (ref.slice(0, 10) === "socket.io/") return false;  // Socket.IO server route
     return true;
 }
 
@@ -35,9 +36,15 @@ test("every document-relative reference in index.html exists", () => {
     }
 });
 
-test("index.html keeps the Socket.IO client as an intentional root-relative route", () => {
+test("index.html loads the Socket.IO client document-relative", () => {
     const html = fs.readFileSync(INDEX_HTML, "utf8");
-    assert.match(html, /src="\/socket\.io\/socket\.io\.js"/);
+    assert.match(html, /src="socket\.io\/socket\.io\.js"/);
+    assert.doesNotMatch(html, /src="\/socket\.io\/socket\.io\.js"/);
+});
+
+test("index.html exposes a server-filled base-path placeholder", () => {
+    const html = fs.readFileSync(INDEX_HTML, "utf8");
+    assert.match(html, /<meta name="app-base-path" content="">/);
 });
 
 test("every relative url() in style.css resolves to a real file", () => {

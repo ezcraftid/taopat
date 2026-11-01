@@ -4,8 +4,11 @@
 (() => {
     "use strict";
 
-    const IMG_DIR = "/assets/img/";
-    const AUDIO_DIR = "/assets/audio/";
+    // Document-relative so the app works at the site root or under a prefix.
+    const IMG_DIR = "assets/img/";
+    const AUDIO_DIR = "assets/audio/";
+    const asset = (path) => (window.TaoCore && window.TaoCore.assetUrl
+        ? window.TaoCore.assetUrl(path) : path);
 
     const CONFIG = {
         // Every face except "base" is optional: a missing file falls back to a simpler one.
@@ -130,7 +133,7 @@
 
     function urlFor(file, forceMp3) {
         const useMp3 = file.endsWith(".ogg") && (forceMp3 || !CAN_OGG);
-        return AUDIO_DIR + (useMp3 ? file.replace(/\.ogg$/, ".mp3") : file);
+        return asset(AUDIO_DIR + (useMp3 ? file.replace(/\.ogg$/, ".mp3") : file));
     }
 
     function decode(data) {
@@ -340,10 +343,10 @@
     Object.entries(CONFIG.images).forEach(([name, file]) => {
         const probe = new Image();
         probe.onload = () => {
-            faces[name] = IMG_DIR + file;
+            faces[name] = asset(IMG_DIR + file);
             renderFace();
         };
-        probe.src = IMG_DIR + file;     // missing file -> skip silently
+        probe.src = asset(IMG_DIR + file);     // missing file -> skip silently
     });
 
     // Sprite hand: horizontal strip of N equal frames, one frame shown at a time.
@@ -355,12 +358,12 @@
         probe.onload = () => {
             const frameW = probe.naturalWidth / frames;
             patHand.style.setProperty("--hand-ar", `${frameW} / ${probe.naturalHeight}`);
-            patHandSprite.style.backgroundImage = `url("${IMG_DIR + file}")`;
+            patHandSprite.style.backgroundImage = `url("${asset(IMG_DIR + file)}")`;
             patHandSprite.style.backgroundSize = `${frames * 100}% 100%`;
             patHandSprite.hidden = false;
             spriteReady = true;
         };
-        probe.src = IMG_DIR + file;
+        probe.src = asset(IMG_DIR + file);
     })();
 
     // ------------------------------------------------------

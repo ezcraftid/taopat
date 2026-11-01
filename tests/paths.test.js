@@ -79,6 +79,40 @@ test("assetUrl returns the input unchanged when no base is available", () => {
     assert.strictEqual(core.assetUrl("assets/img/x.png"), "assets/img/x.png");
 });
 
+test("appUrl prefixes server routes with the configured base path", () => {
+    core.setBasePath("/TaoPat");
+
+    assert.strictEqual(core.appUrl("/socket.io"), "/TaoPat/socket.io");
+    assert.strictEqual(core.appUrl("api/status"), "/TaoPat/api/status");
+    assert.strictEqual(core.appUrl("/"), "/TaoPat/");
+    assert.strictEqual(core.basePath(), "/TaoPat");
+
+    // Absolute and protocol-relative URLs stay untouched.
+    assert.strictEqual(
+        core.appUrl("https://cdn.example.com/a.js"),
+        "https://cdn.example.com/a.js"
+    );
+    assert.strictEqual(core.appUrl("//cdn.example.com/a.js"), "//cdn.example.com/a.js");
+
+    core.setBasePath(null);
+    assert.strictEqual(core.basePath(), "");
+    assert.strictEqual(core.appUrl("/socket.io"), "/socket.io");
+});
+
+test("assetUrl stays document-relative while appUrl becomes base-aware", () => {
+    core.setBasePath("/TaoPat");
+    core.setAssetBase("http://h/tao/");
+
+    assert.strictEqual(
+        core.assetUrl("assets/img/tao-base.png"),
+        "http://h/tao/assets/img/tao-base.png"
+    );
+    assert.strictEqual(core.appUrl("/socket.io"), "/TaoPat/socket.io");
+
+    core.setBasePath(null);
+    core.setAssetBase(null);
+});
+
 test("resolveAssetUrl preserves URL encoding for non-ASCII / spaced paths", () => {
     // Already-encoded input is preserved verbatim.
     assert.strictEqual(
